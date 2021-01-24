@@ -100,7 +100,7 @@ class PCAE(nn.Module):
         if nonlinear:
             scale_x, scale_y = torch.sigmoid(scale_x) + 1e-2, torch.sigmoid(scale_y) + 1e-2
             trans_x, trans_y, shear = torch.tanh(trans_x * 5.),  torch.tanh(trans_y * 5.), torch.tanh(shear * 5.)
-            theta *= 2. * math.pi
+            theta =theta * 2. * math.pi
         else:
             scale_x, scale_y = (abs(i) + 1e-2 for i in (scale_x, scale_y))
 
@@ -195,7 +195,7 @@ class OCAE(nn.Module):
         log_likelihood = (before_log*(d_m.view(before_log.shape[0],-1))).sum(-1).mean() #scalar
         return log_likelihood, a_k.squeeze(-1).squeeze(-1),a_kn.squeeze(-1).squeeze(-1),gaussian.squeeze(-1).squeeze(-1)
 
-class SCAE(nn.Module):
+class SCAE(nn.Module): # main model, the entry //todo
     def __init__(self,config=None):
         super(SCAE,self).__init__()
         self.pcae = PCAE(config)
@@ -205,7 +205,7 @@ class SCAE(nn.Module):
         part_likelihood,a_k,a_kn,gaussian = self.ocae(input_ocae,x_m,d_m,device,mode)
         return image_likelihood,part_likelihood,a_k,a_kn,gaussian
 
-class SCAE_LOSS(nn.Module):
+class SCAE_LOSS(nn.Module): # //todo
     def __init__(self):
         super(SCAE_LOSS,self).__init__()
     def entropy(self,x):

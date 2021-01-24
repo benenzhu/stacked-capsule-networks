@@ -68,19 +68,22 @@ def evaluate(model,train,test,K,device):
 
 def train(args,train,test,device):
 
-    scae = model.SCAE()
+    scae = model.SCAE() # using model.SCAE as the main model
     if torch.cuda.device_count() > 1:
         scae = nn.DataParallel(scae)
     scae.to(device)
-    total_loss = model.SCAE_LOSS()
+    total_loss = model.SCAE_LOSS() #using model.SCAE_LOSS as main loss
     model_name = "model/scae.model"
     log_name = "log/SCAE"
     prev_best_accuracy = 0.
-    K = args.K
-    C = args.C
+    K = args.K #24
+    C = args.C #10
     B = args.batch_size
-    if args.load_ext:
-        model_name = args.model_file
+    # if args.load_ext: # 'short_true'
+    log_name = 'log/' + model_name.split('/')[-1]
+    if False:  # 'short_true'
+        model_name = args.model_file #'model.scae.model'
+
         print("loading existing model:->%s" % model_name)
         scae = torch.load(model_name, map_location=lambda storage, loc: storage)
         scae.to(device)     
@@ -91,17 +94,17 @@ def train(args,train,test,device):
                         level=logging.DEBUG, format='%(asctime)s %(levelname)-10s %(message)s')
 
     optimizer = optim.RMSprop(scae.parameters(), lr=args.lr, momentum=0.9,eps=(1/(10*args.batch_size)**2) )
-    k_c = torch.tensor(float(K/C)).to(device)
-    b_c = torch.tensor(float(B/C)).to(device)
+    k_c = torch.tensor(float(K/C)).to(device) #2.4
+    b_c = torch.tensor(float(B/C)).to(device) #12.8
     for epoch in range(args.epochs):    
         ave_loss = 0
         for batch_idx, (x, target) in tqdm(enumerate(train)):
             optimizer.zero_grad()
             scae.train()
             x = Variable(x).to(device)
-            out = scae(x,device,mode='train')
+            out = scae(x,device,mode='train') # model.SCAE() input
 
-            loss = total_loss(out,b_c=b_c,k_c=k_c)
+            loss = total_loss(out,b_c=b_c,k_c=k_c) #model.SCAE_LOSS() for loss
             
             ave_loss = ave_loss * 0.9 + loss.mean().data * 0.1
             loss.mean().backward()
@@ -139,6 +142,14 @@ def main():
     parser.add_argument('--load_ext', action = "store_true")
 
     args = parser.parse_args()
+    args.mode='train'
+    args.model_file='model.scae.model'
+    args.batch_size=128
+    args.epochs=600
+    args.lr=1e-5
+    args.K=24
+    args.C=10
+    args.load_ext='short_true'
 
     root = './data'
     if not os.path.exists(root):
