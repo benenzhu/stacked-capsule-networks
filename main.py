@@ -164,6 +164,8 @@ def main():
     train_loader = torch.utils.data.DataLoader(
                     dataset=train_set,
                     batch_size=args.batch_size,
+                    pin_memory=True,
+
                     shuffle=True)
     test_loader = torch.utils.data.DataLoader(
                     dataset=test_set,
