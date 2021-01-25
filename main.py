@@ -98,9 +98,6 @@ def train(args,train,test,device):
     b_c = torch.tensor(float(B/C)).to(device) #12.8
     for epoch in range(args.epochs):    
         ave_loss = 0
-        for i in tqdm(train):
-            pass
-        return
         batch_idx=0
         for x, target in tqdm(train):
             optimizer.zero_grad()
@@ -116,7 +113,7 @@ def train(args,train,test,device):
             #print(loss)
             optimizer.step()
             batch_idx+=1
-            if (batch_idx+1) % 50 == 0 or (batch_idx+1) == len(train):
+            if (batch_idx+1) % 10 == 0 or (batch_idx+1) == len(train):
                 logging.info('==>>> epoch: {}, batch index: {}, train loss: {:.6f}'.format(
                     epoch, batch_idx+1, ave_loss))
 
