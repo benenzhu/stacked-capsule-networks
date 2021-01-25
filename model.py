@@ -38,21 +38,27 @@ class PCAE(nn.Module):
         self.epsilon = torch.tensor(1e-6)
         
     def forward(self,x,device,mode='train'):
-        outputs = self.capsules(x)
+        # so Why use that as capsules?
+        outputs = self.capsules(x) # [B, 576, 2, 2]
+        # num_capsules 和 num_feature_maps之间有什么关系？
         outputs = outputs.view(-1,self.num_capsules,self.num_feature_maps,*outputs.size()[2:]) #(B,M,24,2,2)
-        attention = outputs[:,:,-1,:,:].unsqueeze(2)
+        # attention 这里？ 没懂 最后一个featuremap 作为attention么？
+        attention = outputs[:,:,-1,:,:].unsqueeze(2) #(B,M,1,2,2)
+        # 这里的*是元组解包的意思，把原来的转换成元组
         attention_soft = self.soft_max(attention.view(*attention.size()[:3],-1)).view_as(attention)
-        feature_maps = outputs[:,:,:-1,:,:]
+        feature_maps = outputs[:,:,:-1,:,:] #去掉最后的那个元素，是attention
+        # 最后那几维度全部加起来, attention算是个权重吧
         part_capsule_param = torch.sum(torch.sum(feature_maps*attention_soft,dim=-1),dim=-1) #(B,M,23)
-
         if mode == 'train':
-            noise_1 = torch.FloatTensor(*part_capsule_param.size()[:2]).uniform_(-2,2).to(device)
+            noise_1 = torch.FloatTensor(*part_capsule_param.size()[:2]).uniform_(-2,2).to(device) #(128,24) #有点不理解这里的东西，是uniform_(-2,2)
         else:
             noise_1 = torch.zeros(*part_capsule_param.size()[:2]).to(device)
-        x_m,d_m,c_z = self.relu(part_capsule_param[:,:,:6]),self.sigmoid(part_capsule_param[:,:,6]+noise_1).view(*part_capsule_param.size()[:2],1),self.relu(part_capsule_param[:,:,7:])
+        x_m,d_m,c_z = self.relu(part_capsule_param[:,:,:6]),\
+                      self.sigmoid(part_capsule_param[:,:,6]+noise_1).view(*part_capsule_param.size()[:2],1),\
+                      self.relu(part_capsule_param[:,:,7:])
 
         # Affine Transform
-        B, _, _, target_size = x.size()
+        B, _, _, target_size = x.size() # (B,1,28,28)
         transformed_templates = [F.grid_sample(self.templates[i].repeat(B,1,1,1).to(device), # sce.to(device) could not transfrom self.templates to "cuda"
                                                F.affine_grid(
                                                    self.geometric_transform(x_m[:,i,:]),  # pose
@@ -158,6 +164,7 @@ class OCAE(nn.Module):
         self.epsilon = torch.tensor(1e-6)
     
     def forward(self,inp,x_m,d_m,device,mode='train'):
+        # equ1 $\mathrm{OV}_{1: K}, \mathbf{c}_{1: K}, a_{1: K}=\mathrm{h}^{\text {caps }}\left(\mathbf{x}_{1: M}\right)$
         object_parts = self.set_transformer(inp) #(B,K,9+16+1)
         if mode == 'train':
             noise_1 = torch.FloatTensor(*object_parts.size()[:2]).uniform_(-2,2).to(device)
@@ -170,6 +177,7 @@ class OCAE(nn.Module):
         ov_k,c_k,a_k = self.relu(object_parts[:,:,:9]).view(*object_parts.size()[:2],1,3,3),self.relu(object_parts[:,:,9:25]),self.sigmoid(object_parts[:,:,-1]+noise_1).view(*object_parts.size()[:2],1,1,1)        
         temp_a =[]
         temp_lambda = []
+        # equ2 $\text { OP }_{k, 1: N}, a_{k, 1: N}, \lambda_{k, 1: N}=\mathrm{h}_{\mathrm{k}}^{\text {part }}\left(\mathbf{c}_{k}\right)$
         for num,mlp in enumerate(self.mlps):
             mlp_out = self.mlps[num](c_k[:,num,:])
             temp_a.append(self.sigmoid(mlp_out[:,:24]+noise_2).unsqueeze(1))
@@ -177,6 +185,7 @@ class OCAE(nn.Module):
         a_kn = torch.cat(temp_a,1).unsqueeze(-1).unsqueeze(-1) #(B,K,M,1,1)
         lambda_kn = torch.cat(temp_lambda,1).unsqueeze(-1).unsqueeze(-1) #(B,K,M,1,1)
         lambda_kn = lambda_kn*1+self.epsilon #for supressing nan values when taking reciprocal
+        # equ3 $V_{k, n}=OV_k * OP_kn $
         v_kn = ov_k.matmul(self.op_mat) #(B,K,M,3,3)
         mu_kn = v_kn.view(*v_kn.size()[:3],-1)[:,:,:,:6] #(B,K,M,6)
         x_m = x_m.unsqueeze(1) #(B,1,M,6)

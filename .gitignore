@@ -3,3 +3,6 @@ __pycache__
 model/*
 .idea
 data
+MNIST/processed/test.pt
+MNIST/processed/training.pt
+MNIST
